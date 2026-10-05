@@ -249,7 +249,7 @@ dialog::backdrop{background:rgba(5,10,14,.55)}
 .fset{border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
 .fset legend{font:600 .7rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding:0 6px}
 details.fset summary{cursor:pointer;font:600 .7rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
-.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px 16px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 16px}
 .field.wide{grid-column:1 / -1}
 .field small,.fset small{font-size:.76rem;color:var(--ink-2);line-height:1.35}
 .field input,.field select{width:100%}
@@ -274,7 +274,12 @@ input[type=number],input[type=time],input[type=password]{background:var(--panel-
 @media (max-width:760px){.admin-row{grid-template-columns:1fr 1fr}.days{grid-template-columns:repeat(4,1fr)}}
 
 /* v2.1: role picker, admin names, update banner */
-.known .kp .role-pick{grid-column:2;grid-row:2;justify-self:end;font-size:.74rem;padding:2px 6px;border-radius:4px}
+.role-link{background:none;border:0;padding:0;font:inherit;color:var(--ink-2);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.role-link:hover{color:var(--ink)}
+.role-link.perm-3,.role-link.perm-6{color:var(--info)}
+.role-link.perm-9{color:var(--accent)}
+.known .role-pick{font:inherit;font-size:.74rem;padding:1px 4px;border-radius:4px}
+.known .kp .f{display:inline-flex;align-items:baseline;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .admin-row{grid-template-columns:minmax(220px,1.3fr) 130px minmax(140px,1.2fr) auto auto}
 .aid{display:flex;flex-direction:column;gap:3px;min-width:0}
 .aname{font-size:.78rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

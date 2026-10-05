@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0
+
+- **Daily wipes for everything else:** a third daily option wipes every visited playfield *outside* the starter systems (planets, moons and space), alongside the existing starter-system and space-sector options. Wipe types are merged per playfield, so nothing is wiped twice.
+- **Compact Known players list:** a player's server role now shows as a small link next to their faction. Click it to change the role.
+
 ## 2.1.0
 
 First public release.

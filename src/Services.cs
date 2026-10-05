@@ -658,7 +658,7 @@ public class TaskService(ManagerOptions o)
     string Mode(string key) => key == "daily" ? "Daily" : "Weekly";
 
     public string Description(string key) => key == "daily"
-        ? $"Restart, backup{(o.Maintenance.DailyStarterWipe.Length > 0 ? ", starter-system " + o.Maintenance.DailyStarterWipe + " wipe" : "")}{(o.Maintenance.DailySpaceWipe.Length > 0 ? ", " + o.Maintenance.DailySpaceWipe + " wipe in every visited space sector (asteroids)" : "")}{(o.Maintenance.TwiceDaily ? ". Twice a day (every 12 hours)" : "")}"
+        ? $"Restart, backup{(o.Maintenance.DailyStarterWipe.Length > 0 ? ", starter-system " + o.Maintenance.DailyStarterWipe + " wipe" : "")}{(o.Maintenance.DailySpaceWipe.Length > 0 ? ", " + o.Maintenance.DailySpaceWipe + " wipe in every visited space sector (asteroids)" : "")}{(o.Maintenance.DailyOtherWipe.Length > 0 ? ", " + o.Maintenance.DailyOtherWipe + " wipe on everything else visited" : "")}{(o.Maintenance.TwiceDaily ? ". Twice a day (every 12 hours)" : "")}"
         : $"Restart, backup{(o.Maintenance.WeeklyWipe.Length > 0 ? ", " + o.Maintenance.WeeklyWipe + " wipe on every visited playfield" : "")}";
 
     /// <summary>Local time the task fires: the restart time (+ offset hours) minus the longest warning.</summary>

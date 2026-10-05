@@ -290,7 +290,8 @@ public static class SettingsApi
             if (m.WarnMinutes.Any(w => w < 1 || w > 120)) return Fail("Warnings must be between 1 and 120 minutes.");
             if (m.BackupsToKeep is < 1 or > 365) return Fail("Keep between 1 and 365 backups.");
             var validWipe = new Regex(@"^(\s*(poi|deposit|terrain|player)\s*)*$");
-            if (!validWipe.IsMatch(m.DailyStarterWipe) || !validWipe.IsMatch(m.DailySpaceWipe) || !validWipe.IsMatch(m.WeeklyWipe))
+            m.DailyOtherWipe ??= "";
+            if (!validWipe.IsMatch(m.DailyStarterWipe) || !validWipe.IsMatch(m.DailySpaceWipe) || !validWipe.IsMatch(m.DailyOtherWipe) || !validWipe.IsMatch(m.WeeklyWipe))
                 return Fail("Wipe types can only be poi, deposit, terrain or player.");
             string[] days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
             if (m.DailyDays.Concat(m.WeeklyDays).Any(d => !days.Contains(d))) return Fail("Unknown day.");

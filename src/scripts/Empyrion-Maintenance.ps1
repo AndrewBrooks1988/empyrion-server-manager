@@ -77,6 +77,7 @@ $WarnAt         = @(Use $m.warnMinutes @(15, 10, 5, 1)) | Sort-Object -Descendin
 $StarterSystems = @($m.starterSystems | Where-Object { $_ })
 $DailyWipe      = "$($m.dailyStarterWipe)".Trim()         # starter systems, visited playfields ('' = none)
 $DailySpaceWipe = "$($m.dailySpaceWipe)".Trim()           # every visited SPACE playfield ('' = none)
+$DailyOtherWipe = "$($m.dailyOtherWipe)".Trim()           # every visited playfield OUTSIDE the starter systems ('' = none)
 $WeeklyWipe     = "$($m.weeklyWipe)".Trim()               # every visited playfield ('' = none)
 $SkipTypes      = @(Use $m.skipTypes @('SunRandom', 'SpaceWarpTargetFixed', 'GasGiant'))
 $BackupsToKeep  = [int](Use $m.backupsToKeep 14)
@@ -205,8 +206,9 @@ function Get-WipeCommands {
     $commands = foreach ($pf in $visited) {
         $types = @()
         if ($DailyWipe -and $starter.Contains($pf)) { $types += $DailyWipe }
+        if ($DailyOtherWipe -and -not $starter.Contains($pf) -and $typeOf.ContainsKey($pf) -and $SkipTypes -notcontains $typeOf[$pf]) { $types += $DailyOtherWipe }
         if ($DailySpaceWipe -and $typeOf.ContainsKey($pf) -and $SkipTypes -notcontains $typeOf[$pf] -and (Test-SpaceType $typeOf[$pf])) { $types += $DailySpaceWipe }
-        if ($types.Count) { "wipe '$pf' $(($types | Select-Object -Unique) -join ' ')" }
+        if ($types.Count) { "wipe '$pf' $(($types -join ' ' -split '\s+' | Where-Object { $_ } | Select-Object -Unique) -join ' ')" }
     }
     @($commands)
 }

@@ -19,6 +19,8 @@ public class MaintenanceSettings
     public string DailyStarterWipe { get; set; } = "deposit";
     /// <summary>Wipe types for every visited space playfield (daily). 'poi' respawns asteroids in scenarios where they are POIs.</summary>
     public string DailySpaceWipe { get; set; } = "poi";
+    /// <summary>Wipe types for every visited playfield OUTSIDE the starter systems (daily; planets and space). Empty = none.</summary>
+    public string DailyOtherWipe { get; set; } = "";
     /// <summary>Wipe types for every visited playfield (weekly).</summary>
     public string WeeklyWipe { get; set; } = "poi deposit terrain";
     /// <summary>Solar system names (from Sectors.yaml) treated as starter systems.</summary>

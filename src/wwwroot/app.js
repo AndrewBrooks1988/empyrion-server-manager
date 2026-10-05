@@ -286,10 +286,9 @@ async function refreshPeople() {
     const spawned = new Set(players.map(p => p.name));
     const pending = history.filter(h => h.entityId == null && !spawned.has(h.name));
     $("#known").innerHTML = (players.length ? players.map(p => `
-      <div class="kp ${online.has(p.name) ? "on" : ""}"><span class="n">${esc(p.name)}</span><span class="f" title="Faction and faction role">${esc(p.faction)} · ${esc(p.role)}</span>
-        <span class="kp-sub">${esc(seen(byName.get(p.name)))}</span>
-        ${p.steamId ? `<select class="role-pick" title="Server permission" aria-label="Server role for ${esc(p.name)}" data-sid="${esc(p.steamId)}" data-name="${esc(p.name)}" data-eid="${p.entityId}" data-was="${p.permission}">
-          ${[[0, "Player"], [3, "GameMaster"], [6, "Moderator"], [9, "Admin"]].map(([v, n]) => `<option value="${v}" ${v === p.permission ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}</div>`).join("")
+      <div class="kp ${online.has(p.name) ? "on" : ""}"><span class="n">${esc(p.name)}</span>
+        <span class="f">${p.steamId ? `<span class="role-slot">${roleLink(p)}</span> · ` : ""}<span title="Faction and faction role">${esc(p.faction)} · ${esc(p.role)}</span></span>
+        <span class="kp-sub">${esc(seen(byName.get(p.name)))}</span></div>`).join("")
       : `<p class="empty">Nobody has spawned in yet.</p>`)
       + (pending.length ? `
       <div class="kp-head">Joined but never spawned</div>` + pending.map(h => `
@@ -304,20 +303,41 @@ async function refreshPeople() {
       : `<p class="empty">Nobody is banned.</p>`;
   } catch {}
 }
+// Server role: shown as a small link next to the faction; clicking it swaps in a role picker.
+const ROLE_NAMES = { 0: "player", 3: "gamemaster", 6: "moderator", 9: "admin" };
+const ROLE_LABELS = { 0: "Player", 3: "GameMaster", 6: "Moderator", 9: "Admin" };
+function roleLink(p) {
+  return `<button type="button" class="role-link perm-${p.permission}" title="Server role. Click to change"
+    data-sid="${esc(p.steamId)}" data-name="${esc(p.name)}" data-eid="${p.entityId}" data-perm="${p.permission}">${ROLE_LABELS[p.permission] || "Player"}</button>`;
+}
+function roleFrom(el) { return { steamId: el.dataset.sid, name: el.dataset.name, entityId: +el.dataset.eid, permission: +el.dataset.perm }; }
+$("#known").addEventListener("click", e => {
+  const link = e.target.closest("button.role-link");
+  if (!link) return;
+  const p = roleFrom(link);
+  link.parentElement.innerHTML = `<select class="role-pick" aria-label="Server role for ${esc(p.name)}"
+      data-sid="${esc(p.steamId)}" data-name="${esc(p.name)}" data-eid="${p.entityId}" data-perm="${p.permission}">
+    ${Object.entries(ROLE_LABELS).map(([v, n]) => `<option value="${v}" ${+v === p.permission ? "selected" : ""}>${n}</option>`).join("")}</select>`;
+  const sel = $("select.role-pick", $("#known"));
+  sel.focus();
+  sel.addEventListener("blur", () => { if (+sel.value === p.permission && sel.isConnected) sel.parentElement.innerHTML = roleLink(p); });
+  sel.addEventListener("keydown", ev => { if (ev.key === "Escape") { sel.value = String(p.permission); sel.blur(); } });
+});
 $("#known").addEventListener("change", async e => {
   const sel = e.target.closest("select.role-pick");
   if (!sel) return;
-  const names = { 0: "player", 3: "gamemaster", 6: "moderator", 9: "admin" }, labels = { 0: "Player", 3: "GameMaster", 6: "Moderator", 9: "Admin" };
-  const perm = +sel.value, name = sel.dataset.name;
-  const ok = await confirmBox(`Make ${name} ${labels[perm]}?`,
-    perm === 0 ? `${name} loses any special permissions.` : `${name} gets ${labels[perm]} permissions on this server (console commands for that level).`,
+  const p = roleFrom(sel), perm = +sel.value, slot = sel.parentElement;
+  const ok = await confirmBox(`Make ${p.name} ${ROLE_LABELS[perm]}?`,
+    perm === 0 ? `${p.name} loses any special permissions.` : `${p.name} gets ${ROLE_LABELS[perm]} permissions on this server (console commands for that level).`,
     "Change role", perm === 9);
-  if (!ok) { sel.value = sel.dataset.was; return; }
-  try {
-    const r = await api(`/players/${sel.dataset.sid}/role`, { role: names[perm], name, entityId: +sel.dataset.eid });
-    toast(r.message + (r.output ? " · server: " + r.output : ""));
-    sel.dataset.was = String(perm);
-  } catch (err) { toast(err.message, true); sel.value = sel.dataset.was; }
+  if (ok) {
+    try {
+      const r = await api(`/players/${p.steamId}/role`, { role: ROLE_NAMES[perm], name: p.name, entityId: p.entityId });
+      toast(r.message + (r.output ? " · server: " + r.output : ""));
+      p.permission = perm;
+    } catch (err) { toast(err.message, true); }
+  }
+  slot.innerHTML = roleLink(p);
 });
 
 async function unban(id) {
@@ -567,6 +587,8 @@ async function loadSchedule() {
         <small class="muted">Visited playfields in the starter systems below.</small></fieldset>
       <fieldset class="fset"><legend>Daily: all space sectors</legend><div class="checks">${wipeBoxes("w-space", m.dailySpaceWipe)}</div>
         <small class="muted">Every visited space playfield. <b>poi</b> respawns asteroids in scenarios where they're POIs (e.g. Reforged Eden).</small></fieldset>
+      <fieldset class="fset"><legend>Daily: everything else visited</legend><div class="checks">${wipeBoxes("w-other", m.dailyOtherWipe || "")}</div>
+        <small class="muted">Every visited playfield <b>outside</b> the starter systems (planets, moons and space). Leave empty to keep those for the weekly reset.</small></fieldset>
       <fieldset class="fset"><legend>Weekly: everywhere visited</legend><div class="checks">${wipeBoxes("w-weekly", m.weeklyWipe)}</div>
         <small class="muted">Player structures are never wiped; terrain is kept around bases.</small></fieldset>
     </div>
@@ -601,6 +623,7 @@ $("#sched-form").addEventListener("submit", async e => {
       dailyDays: days("daily"), weeklyDays: days("weekly"),
       dailyStarterWipe: checked("w-starter").join(" "),
       dailySpaceWipe: checked("w-space").join(" "),
+      dailyOtherWipe: checked("w-other").join(" "),
       weeklyWipe: checked("w-weekly").join(" "),
       starterSystems: checked("sys"),
       twiceDaily: $("#s-twice").checked,
