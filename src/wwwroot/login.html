@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body{display:grid;place-items:center;min-height:100vh;padding-block:24px}
+  .login{width:min(360px,100%);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:14px}
+  .login input{width:100%}
+</style>
+</head>
+<body>
+<form class="login" id="f" autocomplete="on">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span>Server manager</span></div>
+  <h1>Sign in</h1>
+  <label class="field" for="pw">Dashboard password
+    <input id="pw" type="password" autocomplete="current-password" required autofocus>
+  </label>
+  <button class="btn primary" type="submit">Sign in</button>
+  <p id="msg" class="form-status err" role="status"></p>
+</form>
+<script>
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
+  try {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json", "X-Manager": "1" },
+      body: JSON.stringify({ password: document.getElementById("pw").value }) });
+    if (r.ok) { location.href = "/"; return; }
+    msg.textContent = (await r.json().catch(() => ({}))).error || "Sign-in failed.";
+  } catch { msg.textContent = "Can't reach the manager."; }
+});
+</script>
+</body>
+</html>

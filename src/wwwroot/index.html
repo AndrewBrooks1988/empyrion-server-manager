@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23171f24'/%3E%3Cpath d='M8 22 16 7l8 15-8-4z' fill='%23e9963a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="app.css?v=__V__">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="ident">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><span id="brand-title">__TITLE__</span></div>
+    <h1 id="srv-name">Empyrion server</h1>
+    <div class="ident-meta">
+      <span id="state-pill" class="pill" data-state="offline">Offline</span>
+      <span id="meta-uptime" class="meta"></span>
+      <span id="meta-players" class="meta"></span>
+      <span id="meta-scenario" class="meta"></span>
+      <a id="meta-remote" class="remote-chip" href="#remote" hidden></a>
+    </div>
+  </div>
+  <div class="controls" role="group" aria-label="Server controls">
+    <button id="btn-start" class="btn primary" data-act="start">Start</button>
+    <button id="btn-restart" class="btn" data-act="restart">Restart…</button>
+    <button id="btn-stop" class="btn danger" data-act="stop">Stop…</button>
+    <button id="btn-play" class="btn ghost" data-act="play" title="Restart the server around launching the game on this PC, so Steam lets you play">Play on this PC…</button>
+  </div>
+</header>
+
+<section id="jobbar" class="jobbar" hidden aria-live="polite">
+  <div class="jobbar-head">
+    <span id="job-state" class="job-state"></span>
+    <strong id="job-title"></strong>
+    <span id="job-time" class="muted"></span>
+    <button id="job-toggle" class="link" aria-expanded="false">Show output</button>
+    <button id="job-dismiss" class="link" hidden>Dismiss</button>
+  </div>
+  <div id="job-last" class="job-last mono"></div>
+  <pre id="job-output" class="job-output" hidden></pre>
+</section>
+
+<div id="update-banner" class="setup-banner update" hidden>
+  <span id="update-text"></span>
+  <span class="btn-row"><a id="update-notes" class="btn sm ghost" target="_blank" rel="noopener">Release notes</a>
+  <button class="btn primary sm" id="update-install" type="button">Install update</button>
+  <button class="link" id="update-later" type="button">Later</button></span>
+</div>
+
+<div id="setup-banner" class="setup-banner" hidden>
+  <span><b>Finish setting up.</b> Choose your server folder and config file, and turn on Telnet, so the manager can control the server.</span>
+  <button class="btn primary sm" id="setup-go" type="button">Open setup</button>
+</div>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true">Overview</button>
+  <button role="tab" id="tab-console" aria-controls="view-console" aria-selected="false">Console &amp; log</button>
+  <button role="tab" id="tab-maintenance" aria-controls="view-maintenance" aria-selected="false">Maintenance</button>
+  <button role="tab" id="tab-backups" aria-controls="view-backups" aria-selected="false">Backups</button>
+  <button role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false">Settings</button>
+</nav>
+
+<main>
+  <!-- ======================================================= overview -->
+  <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview" class="view">
+    <div class="metrics">
+      <div class="metric"><span class="k">Players</span><span class="v" id="m-players">–</span><span class="s" id="m-players-s">&nbsp;</span></div>
+      <div class="metric"><span class="k">Server tick</span><span class="v" id="m-fps">–</span><span class="s" id="m-fps-s">&nbsp;</span></div>
+      <div class="metric"><span class="k">Playfields</span><span class="v" id="m-pfs">–</span><span class="s" id="m-pfs-s">&nbsp;</span></div>
+      <div class="metric"><span class="k">Host load</span><span class="v" id="m-load">–</span><span class="s" id="m-load-s">&nbsp;</span></div>
+      <div class="metric"><span class="k">Next maintenance</span><span class="v" id="m-next">–</span><span class="s" id="m-next-s">&nbsp;</span></div>
+    </div>
+
+    <div class="cols">
+      <div class="col-main">
+        <div class="panel">
+          <div class="panel-head"><h2>Online now</h2><span class="muted" id="players-count"></span></div>
+          <div id="players" class="players"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Chat</h2><span class="muted">Messages you send appear in game for everyone</span></div>
+          <div class="chat-legend" aria-label="Chat channels">
+            <span class="ch-global">Global</span><span class="ch-faction">Faction</span><span class="ch-alliance">Alliance</span>
+            <span class="ch-server">To admins</span><span class="ch-private">Private</span><span class="ch-dashboard">From dashboard</span>
+          </div>
+          <ol id="chat" class="chat" aria-live="polite"></ol>
+          <form id="say-form" class="inline-form" autocomplete="off">
+            <label for="say-text" class="sr-only">Message everyone</label>
+            <input id="say-text" type="text" maxlength="200" placeholder="Message everyone, e.g. Restarting for an update in 10 minutes">
+            <button class="btn primary" type="submit">Send</button>
+          </form>
+          <p id="say-status" class="form-status" role="status"></p>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="panel" id="remote">
+          <div class="panel-head"><h2>Remote access</h2><span id="remote-pill" class="pill" data-state="offline">Checking…</span></div>
+          <div id="remote-body" class="remote-body"><p class="muted small">Checking Tailscale…</p></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Activity</h2><span class="muted">This session</span></div>
+          <ol id="activity" class="activity"></ol>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Known players</h2><span class="muted">Everyone who has joined</span></div>
+          <div id="known" class="known"><p class="empty">Shown while the server is online.</p></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Bans</h2></div>
+          <div id="bans"><p class="empty">Shown while the server is online.</p></div>
+          <form id="unban-form" class="inline-form" autocomplete="off">
+            <label for="unban-id" class="sr-only">SteamID64 to unban</label>
+            <input id="unban-id" type="text" class="mono" inputmode="numeric" maxlength="17" placeholder="SteamID64 to unban">
+            <button class="btn" type="submit">Unban</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= console -->
+  <section id="view-console" role="tabpanel" aria-labelledby="tab-console" class="view" hidden>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Console</h2>
+        <div class="chips">
+          <button class="chip" data-cmd="help">help</button>
+          <button class="chip" data-cmd="plys">plys</button>
+          <button class="chip" data-cmd="gents">gents</button>
+        </div>
+      </div>
+      <div id="console-out" class="console-out mono" aria-live="polite"><div class="muted">Commands run through the server's Telnet console. Try <b>help</b> to see what's available.</div></div>
+      <form id="console-form" class="inline-form" autocomplete="off">
+        <label for="console-cmd" class="sr-only">Command</label>
+        <span class="prompt mono" aria-hidden="true">&gt;</span>
+        <input id="console-cmd" type="text" class="mono" placeholder="Type a server command and press Enter">
+        <button class="btn" type="submit">Run</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Server log</h2>
+        <div class="log-tools">
+          <div class="seg" role="group" aria-label="Filter">
+            <button data-filter="useful" aria-pressed="true">Useful</button>
+            <button data-filter="all" aria-pressed="false">Everything</button>
+            <button data-filter="player" aria-pressed="false">Players</button>
+            <button data-filter="problems" aria-pressed="false">Problems</button>
+          </div>
+          <label for="log-search" class="sr-only">Search log</label>
+          <input id="log-search" type="search" placeholder="Search">
+          <label class="check"><input id="log-follow" type="checkbox" checked> Follow</label>
+        </div>
+      </div>
+      <div id="log" class="log mono" tabindex="0" aria-label="Server log"></div>
+      <p class="muted small" id="log-file"></p>
+    </div>
+  </section>
+
+  <!-- ======================================================= maintenance -->
+  <section id="view-maintenance" role="tabpanel" aria-labelledby="tab-maintenance" class="view" hidden>
+    <div id="tasks" class="tasks"></div>
+    <div class="panel">
+      <div class="panel-head"><h2>Schedule &amp; resets</h2><span class="muted small" id="sched-summary"></span></div>
+      <form id="sched-form" class="form" autocomplete="off"></form>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Maintenance log</h2><span class="muted">Newest first</span></div>
+      <div id="mlog" class="log mono short"></div>
+    </div>
+  </section>
+  <!-- ======================================================= backups -->
+  <section id="view-backups" role="tabpanel" aria-labelledby="tab-backups" class="view" hidden>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Backups</h2>
+        <button id="btn-backup" class="btn">Back up now</button>
+      </div>
+      <p class="muted small">Scheduled maintenance backs the world up every day at 4am and keeps the last 14. Manual and pre-restore copies are never deleted automatically. Backing up and restoring both need the server stopped.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Backup</th><th>Type</th><th>Taken</th><th class="n">Size</th><th></th></tr></thead>
+          <tbody id="backups"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= settings -->
+  <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" class="view" hidden>
+    <nav class="subtabs" role="tablist" aria-label="Settings sections">
+      <button role="tab" data-sub="setup" aria-selected="true">Setup</button>
+      <button role="tab" data-sub="server" aria-selected="false">Server config</button>
+      <button role="tab" data-sub="rules" aria-selected="false">Game rules</button>
+      <button role="tab" data-sub="admins" aria-selected="false">Admins</button>
+      <button role="tab" data-sub="about" aria-selected="false">About</button>
+    </nav>
+    <div id="sub-setup" class="sub"></div>
+    <div id="sub-server" class="sub" hidden></div>
+    <div id="sub-rules" class="sub" hidden></div>
+    <div id="sub-admins" class="sub" hidden></div>
+    <div id="sub-about" class="sub" hidden></div>
+  </section></main>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- ======================================================= dialogs -->
+<dialog id="dlg-power">
+  <form method="dialog" class="dlg">
+    <h2 id="power-title">Restart server</h2>
+    <p id="power-desc" class="muted"></p>
+    <fieldset class="warn-pick">
+      <legend>Warn players first</legend>
+      <label><input type="radio" name="warn" value="0"> Now</label>
+      <label><input type="radio" name="warn" value="1"> 1 min</label>
+      <label><input type="radio" name="warn" value="5" checked> 5 min</label>
+      <label><input type="radio" name="warn" value="15"> 15 min</label>
+    </fieldset>
+    <div class="dlg-actions">
+      <button value="cancel" class="btn ghost">Cancel</button>
+      <button value="ok" id="power-ok" class="btn primary">Restart</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-player">
+  <form method="dialog" class="dlg">
+    <h2 id="player-title">Kick player</h2>
+    <p id="player-desc" class="muted"></p>
+    <label class="field" id="player-reason-wrap" for="player-reason"><span id="player-reason-label">Reason (shown to the player)</span>
+      <input id="player-reason" type="text" maxlength="160" placeholder="Kicked by admin">
+    </label>
+    <label class="field" id="player-duration-wrap" for="player-duration">Ban length
+      <select id="player-duration">
+        <option value="1h">1 hour</option><option value="1d" selected>1 day</option>
+        <option value="7d">7 days</option><option value="14d">14 days</option>
+        <option value="1m">1 month</option><option value="12m">12 months</option>
+      </select>
+    </label>
+    <div class="dlg-actions">
+      <button value="cancel" class="btn ghost">Cancel</button>
+      <button value="ok" id="player-ok" class="btn danger">Kick</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-restore">
+  <form method="dialog" class="dlg">
+    <h2>Restore backup</h2>
+    <p class="muted">This replaces the current world with <b id="restore-name"></b>. The current world is copied to a <i>pre-restore</i> backup first, so you can undo this.</p>
+    <label class="field" for="restore-confirm">Type the backup name to confirm
+      <input id="restore-confirm" type="text" class="mono" autocomplete="off">
+    </label>
+    <div class="dlg-actions">
+      <button value="cancel" class="btn ghost">Cancel</button>
+      <button value="ok" id="restore-ok" class="btn danger" disabled>Restore</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-confirm">
+  <form method="dialog" class="dlg">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p id="confirm-text" class="muted"></p>
+    <div class="dlg-actions">
+      <button value="cancel" class="btn ghost">Cancel</button>
+      <button value="ok" id="confirm-ok" class="btn primary">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js?v=__V__"></script>
+</body>
+</html>

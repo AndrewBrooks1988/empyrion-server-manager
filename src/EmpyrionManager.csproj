@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EmpyrionManager</RootNamespace>
+    <AssemblyName>EmpyrionManager</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>2.1.0</Version>
+    <Product>Empyrion Server Manager</Product>
+    <Copyright>Copyright (c) 2026 AndrewBrooks1988. MIT License.</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- maintenance script ships next to the exe (scripts\) -->
+    <None Include="scripts\**\*.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- never ship personal settings -->
+    <Content Remove="manager-settings.json" />
+    <None Remove="manager-settings.json" />
+  </ItemGroup>
+
+</Project>

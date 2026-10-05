@@ -1,0 +1,13 @@
+# build output
+src/bin/
+src/obj/
+tools/**/bin/
+tools/**/obj/
+app/
+dist/
+
+# personal settings, data and keys - never commit
+manager-settings.json
+*.bak
+*.pem
+!tools/update-public-key.pem
