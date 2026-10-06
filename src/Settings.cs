@@ -60,6 +60,8 @@ public class ManagerOptions
     public bool OpenBrowserOnStart { get; set; } = true;
     /// <summary>Check GitHub for new releases (startup + every 6 hours).</summary>
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>Show restart/stop warnings as on-screen alerts too (needs the alert mod installed and running).</summary>
+    public bool UseAlerts { get; set; } = true;
     public MaintenanceSettings Maintenance { get; set; } = new();
     public TaskSettings Tasks { get; set; } = new();
 

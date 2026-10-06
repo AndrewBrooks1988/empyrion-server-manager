@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Dedicated-server mod for Empyrion (legacy ModInterface). Loaded by the game's Mono runtime, so it targets
+    .NET Framework 4.8. Mif.dll (Eleon's modding interface) is referenced from your Empyrion install and is NOT
+    redistributed: set EmpyrionManaged to your server's ...\DedicatedServer\EmpyrionDedicated_Data\Managed folder.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>EmpyrionManagerAlerts</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EmpyrionManaged Condition="'$(EmpyrionManaged)' == ''">C:\GameServers\Empyrion\empyriondedicatedserver\DedicatedServer\EmpyrionDedicated_Data\Managed</EmpyrionManaged>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Mif">
+      <HintPath>$(EmpyrionManaged)\Mif.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="EmpyrionManagerAlerts_Info.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

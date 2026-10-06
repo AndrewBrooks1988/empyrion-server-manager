@@ -91,6 +91,8 @@
           <form id="say-form" class="inline-form" autocomplete="off">
             <label for="say-text" class="sr-only">Message everyone</label>
             <input id="say-text" type="text" maxlength="200" placeholder="Message everyone, e.g. Restarting for an update in 10 minutes">
+            <label for="say-mode" class="sr-only">Send as</label>
+            <select id="say-mode" class="say-mode"><option value="chat">Chat</option></select>
             <button class="btn primary" type="submit">Send</button>
           </form>
           <p id="say-status" class="form-status" role="status"></p>

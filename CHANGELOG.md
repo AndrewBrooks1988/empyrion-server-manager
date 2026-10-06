@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.0
+
+- **On-screen alerts:** restart and shutdown warnings (and any message you choose) can now appear as the game's coloured banner at the top of the screen, with a sound, not just in chat. Blue changes to yellow, then red, as a restart gets close. This uses a tiny server-side mod (`EmpyrionManagerAlerts`) that the manager installs from **Settings -> Setup -> On-screen alerts**. It runs on the server only, so players don't need anything. Without the mod, everything falls back to chat.
+- **Message everyone** can send as chat plus an on-screen alert (blue, yellow or red).
+
 ## 2.3.0
 
 - **At risk of decay:** a new Overview panel lists player structures the game's decay rule will remove (no core, or fewer than 10 blocks), with time left before removal, colour-coded as it gets close. Overdue structures go the next time anyone enters their playfield. Visiting a structure resets its timer.

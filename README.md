@@ -21,6 +21,7 @@ Nothing about a particular server is built in. Everything is set up from the das
   - *Server config:* edit the dedicated server's `.yaml` (name, description, password, ports, players, blueprints, save name, scenario…). Comments and layout are preserved, and a `.bak` copy is made before every save.
   - *Game rules:* edit the active save's `gameoptions.yaml` (limits, anti-grief, difficulty…).
   - *Admins:* admin/moderator/game-master SteamIDs and login priority. Changes apply to a running server immediately.
+- **On-screen alerts:** restart warnings and announcements appear as the game's top-of-screen banner with sound, using an optional server-side mod installed from Settings → Setup. Players need nothing.
 - **Twice-daily maintenance:** optional, for busy servers (every 12 hours).
 - **Roles from the player list:** make someone Player, GameMaster, Moderator or Admin straight from *Known players*. The Admins page shows in-game and Steam names next to each SteamID.
 - **Auto-updates** from GitHub Releases, signature-checked.
@@ -85,7 +86,7 @@ Logs written to the server folder: `Logs\Maintenance\YYYY-MM.log` (maintenance r
 
 ## Building from source
 
-Requires the .NET 10 SDK.
+Requires the .NET 10 SDK. Building the alert mod (`mod\EmpyrionManagerAlerts`) also needs an Empyrion dedicated server install for `Mif.dll`; set `EmpyrionManaged` to its `DedicatedServer\EmpyrionDedicated_Data\Managed` folder.
 
 ```
 cd src

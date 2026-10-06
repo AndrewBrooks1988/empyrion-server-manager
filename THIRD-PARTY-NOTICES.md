@@ -24,6 +24,10 @@ Empyrion Server Manager is MIT-licensed (see `LICENSE`). It builds on, ships wit
 | [Inno Setup](https://jrsoftware.org/isinfo.php) | Jordan Russell and Martijn Laan | Inno Setup License (free, including commercial use) | Builds the Windows installer |
 | [.NET SDK](https://dotnet.microsoft.com) | Microsoft | MIT | Compiles the application |
 
+## Server mod
+
+The optional on-screen alert mod (`mod\EmpyrionManagerAlerts`, MIT like the rest of this project) is built against Eleon's modding interface `Mif.dll`. That file is part of the Empyrion dedicated server, is **not** included in this repository or its releases, and is loaded from the server at runtime.
+
 ## Services and software it works with (not included)
 
 - **[Empyrion – Galactic Survival](https://empyriongame.com)** and its dedicated server, © Eleon Game Studios. This is an unofficial, fan-made tool and isn't affiliated with or endorsed by Eleon. "Empyrion" is used only to describe compatibility.

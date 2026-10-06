@@ -1,0 +1,9 @@
+# Empyrion Server Manager - alert bridge
+Name: Empyrion Server Manager Alerts
+Description: Shows the manager's restart warnings and announcements as on-screen alerts (with sound) instead of only chat.
+Author: Empyrion Server Manager
+Version: 1.0
+Website: https://github.com/AndrewBrooks1988/empyrion-server-manager
+
+# Runs on the dedicated server only; players don't need anything.
+ModTargets: Dedi

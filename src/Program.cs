@@ -33,6 +33,7 @@ builder.Services.AddSingleton<AdminService>();
 builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<SteamNames>();
 builder.Services.AddSingleton<DecayService>();
+builder.Services.AddSingleton<AlertService>();
 builder.Services.AddSingleton<UpdateService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdateService>());
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);

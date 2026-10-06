@@ -32,6 +32,16 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 'web.config' | ForEach-Object { $f = Join-Path $stage $_; if (Test-Path $f) { Remove-Item $f } }
 Copy-Item (Join-Path $root 'README.md') $stage
 
+# ---- the on-screen alert server mod (bundled in mod\, installed into the server from the dashboard).
+# Built against Mif.dll from a local Empyrion install (Eleon's file - referenced, never redistributed).
+$modProj = Join-Path $root 'mod\EmpyrionManagerAlerts'
+Write-Host "Building alert mod ..."
+dotnet build $modProj -c Release -nologo -v q
+if ($LASTEXITCODE -ne 0) { throw "Alert mod build failed (is EmpyrionManaged pointing at your server's Managed folder?)" }
+$modOut = Join-Path $stage 'mod\EmpyrionManagerAlerts'
+New-Item -ItemType Directory -Force $modOut | Out-Null
+Copy-Item (Join-Path $modProj 'bin\Release\net48\EmpyrionManagerAlerts.dll'), (Join-Path $modProj 'bin\Release\net48\EmpyrionManagerAlerts_Info.yaml') $modOut
+
 # ---- safety checks: nothing personal in a release
 $personal = Get-ChildItem $stage -Recurse -File | Where-Object { $_.Name -match '^manager-settings\.json|\.bak$|players\.json|sent-messages' }
 if ($personal) { throw "Personal files in the release: $($personal.Name -join ', ')" }

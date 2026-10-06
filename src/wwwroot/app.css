@@ -297,3 +297,6 @@ a.btn{text-decoration:none;color:inherit;display:inline-block}
 .decay .dk .kp-sub{grid-column:1 / -1;font:400 .74rem/1.3 var(--mono);color:var(--ink-2)}
 .decay .dk.near{border-left-color:var(--warn)} .decay .dk.near .t{color:var(--warn)}
 .decay .dk.soon,.decay .dk.over{border-left-color:var(--bad)} .decay .dk.soon .t,.decay .dk.over .t{color:var(--bad)}
+
+.say-mode{max-width:44%}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}

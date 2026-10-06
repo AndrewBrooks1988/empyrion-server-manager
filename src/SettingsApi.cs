@@ -11,6 +11,7 @@ public record PasswordRequest(string? Password);
 public record TaskNamesRequest(string? Folder, string? DailyName, string? WeeklyName);
 public record RoleRequest(string? Role, string? Name, int? EntityId);
 public record PrefsRequest(bool? CheckForUpdates, bool? OpenBrowserOnStart);
+public record AlertRequest(string? Text, int? Prio, double? Seconds, bool? UseForWarnings);
 
 /// <summary>Endpoints behind the Settings pages: setup, server config, game rules, admins, schedule and tasks.</summary>
 public static class SettingsApi
@@ -129,6 +130,33 @@ public static class SettingsApi
             if (steamCmd == null) return Fail("SteamCMD not found. Set its path in Settings → Setup.");
             try { return Results.Json(new { jobs.Start("update", "Update server (SteamCMD)", job => Setup.UpdateServerAsync(steamCmd, o.ServerDir, job)).Id }); }
             catch (InvalidOperationException ex) { return Fail(ex.Message, 409); }
+        });
+
+        // ---------------------------------------------------------- on-screen alerts (bundled server mod)
+        api.MapGet("/alerts", (AlertService alerts) => Results.Json(alerts.State));
+        api.MapPost("/alerts/install", (AlertService alerts) =>
+        {
+            try
+            {
+                alerts.Install();
+                return Results.Json(new { ok = true, message = Running ? "Alert mod installed. Restart the server to load it." : "Alert mod installed. It loads when the server starts." });
+            }
+            catch (Exception ex) { return Fail(ex.Message); }
+        });
+        api.MapPost("/alerts/uninstall", (AlertService alerts) =>
+        {
+            try { alerts.Uninstall(); return Results.Json(new { ok = true, message = "Alert mod removed." }); }
+            catch (Exception ex) { return Fail(ex.Message); }
+        });
+        api.MapPost("/alerts/send", (AlertRequest req, AlertService alerts) =>
+        {
+            try { alerts.Send(req.Text ?? "", req.Prio ?? 1, req.Seconds ?? 10); return Results.Json(new { ok = true, message = "Alert sent." }); }
+            catch (Exception ex) { return Fail(ex.Message); }
+        });
+        api.MapPost("/alerts/prefs", (AlertRequest req, ManagerOptions o) =>
+        {
+            if (req.UseForWarnings is bool b) { o.UseAlerts = b; o.Save(); }
+            return Results.Json(new { ok = true });
         });
 
         // ---------------------------------------------------------- updates + about

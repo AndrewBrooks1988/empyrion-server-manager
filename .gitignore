@@ -3,6 +3,8 @@ src/bin/
 src/obj/
 tools/**/bin/
 tools/**/obj/
+mod/**/bin/
+mod/**/obj/
 app/
 dist/
 

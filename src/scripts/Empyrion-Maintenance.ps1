@@ -84,6 +84,7 @@ $BackupsToKeep  = [int](Use $m.backupsToKeep 14)
 $PlayWarnAt     = @([int](Use $m.playWarnMinutes 1))
 $SteamGameUri   = Use $cfgJson.steamGameUri 'steam://rungameid/383120'
 $ClientProcess  = 'Empyrion'
+$UseAlerts      = -not ($cfgJson.useAlerts -eq $false)       # on-screen alerts via the EmpyrionManagerAlerts mod
 
 $ShutdownTimeoutSec = 300
 $StartupTimeoutSec  = 900
@@ -163,6 +164,27 @@ function Test-Telnet {
 function Get-DediProcess { Get-Process -Name 'EmpyrionDedicated' -ErrorAction SilentlyContinue | Where-Object { -not $_.Path -or $_.Path -like "$ServerDir*" } }
 
 function Say([string] $text) { [void](Send-Telnet @("say '$($text -replace "'", '')'")) }
+
+# ---- on-screen alerts (banner + sound) through the EmpyrionManagerAlerts server mod, when it's installed and running
+$AlertDir = Join-Path $ServerDir 'Content\Mods\EmpyrionManagerAlerts'
+function Test-AlertMod {
+    $hb = Join-Path $AlertDir 'heartbeat.txt'
+    (Test-Path $hb) -and (((Get-Date).ToUniversalTime() - (Get-Item $hb).LastWriteTimeUtc).TotalSeconds -lt 30)
+}
+# prio: 0 = red, 1 = yellow, 2 = blue
+function Alert([string] $text, [int] $prio = 1, [int] $seconds = 15) {
+    if (-not $UseAlerts) { return $false }
+    if ($DryRun) { Write-Host "  (dry run) on-screen alert [$prio]: $text"; return $true }
+    if (-not (Test-AlertMod)) { return $false }
+    $out = Join-Path $AlertDir 'outbox'
+    New-Item -ItemType Directory -Force $out | Out-Null
+    $name = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+    $tmp = Join-Path $out "$name.tmp"
+    [IO.File]::WriteAllText($tmp, "$prio`n$seconds`nall`n$text", (New-Object Text.UTF8Encoding $false))
+    Move-Item $tmp (Join-Path $out "$name.msg")
+    Write-Log "On-screen alert [$prio]: $text"
+    return $true
+}
 
 # ================================================================ wipe targets
 function Get-WipeCommands {
@@ -247,12 +269,14 @@ if (-not $NoWarning) {
     for ($i = 0; $i -lt $WarnAt.Count; $i++) {
         $m = $WarnAt[$i]
         Say "[SERVER] $what in $m minute$(if ($m -ne 1) { 's' }). Get somewhere safe and log off before then."
+        [void](Alert "$what in $m minute$(if ($m -ne 1) { 's' }). Get somewhere safe." $(if ($m -le 1) { 0 } elseif ($m -le 5) { 1 } else { 2 }) 15)
         $next = if ($i + 1 -lt $WarnAt.Count) { $WarnAt[$i + 1] } else { 0 }
         if (-not $DryRun) { Start-Sleep -Seconds (($m - $next) * 60) }
     }
 }
-if ($Mode -eq 'Stop') { Say '[SERVER] Saving and shutting down NOW.' }
-else { Say '[SERVER] Saving and restarting NOW. Back in a few minutes.' }
+if ($Mode -eq 'Stop') { Say '[SERVER] Saving and shutting down NOW.'; $alerted = Alert 'Server shutting down NOW.' 0 10 }
+else { Say '[SERVER] Saving and restarting NOW. Back in a few minutes.'; $alerted = Alert 'Server restarting NOW. Back in a few minutes.' 0 10 }
+if ($alerted -and -not $DryRun) { Start-Sleep -Seconds 3 }      # let the mod deliver it before the server goes down
 
 # ---- 2. save and shut down
 Write-Log 'Sending saveandexit'
@@ -265,6 +289,9 @@ if (-not $DryRun) {
     Get-Process -Name 'EmpyrionPlayfieldServer' -ErrorAction SilentlyContinue | Where-Object { -not $_.Path -or $_.Path -like "$ServerDir*" } |
         ForEach-Object { Write-Log "Waiting on playfield process $($_.Id)"; $_.WaitForExit(60000) | Out-Null }
     Write-Log 'Server stopped cleanly'
+    # apply an alert-mod update staged while the server had the old DLL loaded
+    $staged = Join-Path $AlertDir 'EmpyrionManagerAlerts.dll.new'
+    if (Test-Path $staged) { Move-Item $staged (Join-Path $AlertDir 'EmpyrionManagerAlerts.dll') -Force; Write-Log 'Applied alert mod update' }
 }
 if ($Mode -eq 'Stop') { Write-Log "==== $Mode finished (server left off)"; exit 0 }
 

@@ -376,6 +376,8 @@ $("#say-form").addEventListener("submit", async e => {
   st.className = "form-status"; st.textContent = "Sending…";
   try {
     await api("/say", { text });
+    const mode = $("#say-mode")?.value || "chat";
+    if (mode !== "chat") await api("/alerts/send", { text, prio: +mode, seconds: 12 });
     input.value = "";
     st.textContent = "";
     refreshChat();
@@ -760,6 +762,10 @@ document.addEventListener("click", e => {
 
 // ---- Setup
 async function loadSetup() {
+  await loadSetupInner();
+  renderAlertsPanel();
+}
+async function loadSetupInner() {
   const box = $("#sub-setup");
   try { setup = await api("/setup"); } catch (e) { box.innerHTML = `<div class="panel"><p class="form-status err">${esc(e.message)}</p></div>`; return; }
   const s = setup;
@@ -1159,6 +1165,82 @@ function confirmBox(title, text, okLabel, danger) {
   });
 }
 
+// ------------------------------------------------------------------ on-screen alerts (server mod)
+let alertState = null;
+const ALERT_COLOURS = [[2, "Blue (info)"], [1, "Yellow (warning)"], [0, "Red (alarm)"]];
+
+async function refreshAlerts() {
+  try { alertState = await api("/alerts"); } catch { return; }
+  // Message-everyone: offer the on-screen option only when the mod is running
+  const pick = $("#say-mode");
+  if (pick) {
+    const keep = pick.value;
+    pick.innerHTML = `<option value="chat">Chat</option>` + (alertState.active
+      ? ALERT_COLOURS.map(([p, n]) => `<option value="${p}">Chat + on-screen: ${n.split(" ")[0]}</option>`).join("") : "");
+    pick.value = [...pick.options].some(o => o.value === keep) ? keep : "chat";
+    pick.title = alertState.active ? "Also show it as an on-screen alert (banner + sound)" : "Install the alert mod (Settings → Setup) for on-screen alerts";
+  }
+}
+
+function alertsPanelHtml(a) {
+  const status = !a.bundled ? ["warn", "Not included in this build"]
+    : !a.installed ? ["", "Not installed"]
+    : a.active ? (a.upToDate ? ["ok", "Active"] : ["warn", "Active (update ready, loads on restart)"])
+    : ["warn", "Installed, loads when the server (re)starts"];
+  return `
+  <div class="panel" id="alerts-panel">
+    <div class="panel-head"><h2>On-screen alerts</h2><span class="tag ${status[0]}">${status[1]}</span></div>
+    <p class="muted small" style="margin:0">Shows important messages as the game's coloured banner at the top of the screen, with a sound, instead of only in chat.
+      It works through a tiny server mod (<span class="mono">Content\\Mods\\EmpyrionManagerAlerts</span>). It runs on the server only, so players don't need to install anything.</p>
+    <div class="btn-row">
+      ${!a.installed ? `<button class="btn sm primary" id="al-install" type="button" ${a.bundled ? "" : "disabled"}>Install alert mod</button>`
+        : `${a.upToDate ? "" : `<button class="btn sm primary" id="al-install" type="button">Update mod</button>`}
+           <button class="btn sm danger" id="al-remove" type="button" ${a.active ? "disabled title='Stop the server first'" : ""}>Remove</button>`}
+    </div>
+    <label class="check"><input type="checkbox" id="al-warn" ${a.useForWarnings ? "checked" : ""}> Show restart and shutdown warnings on screen too (blue → yellow → red as the time runs out)</label>
+    ${a.active ? `
+    <form id="al-test" class="inline-form" autocomplete="off">
+      <label for="al-text" class="sr-only">Test alert text</label>
+      <input id="al-text" type="text" maxlength="160" placeholder="Send an on-screen alert to everyone online">
+      <label for="al-prio" class="sr-only">Colour</label>
+      <select id="al-prio">${ALERT_COLOURS.map(([p, n]) => `<option value="${p}">${n}</option>`).join("")}</select>
+      <button class="btn sm" type="submit">Send</button>
+    </form>` : ""}
+  </div>`;
+}
+
+async function renderAlertsPanel() {
+  await refreshAlerts();
+  if (!alertState) return;
+  const old = $("#alerts-panel");
+  if (old) old.outerHTML = alertsPanelHtml(alertState);
+  else $("#sub-setup").insertAdjacentHTML("beforeend", alertsPanelHtml(alertState));
+}
+
+$("#sub-setup").addEventListener("click", async e => {
+  if (e.target.id === "al-install") {
+    try { const r = await api("/alerts/install", {}); toast(r.message); } catch (err) { toast(err.message, true); }
+    renderAlertsPanel();
+  }
+  if (e.target.id === "al-remove") {
+    if (!await confirmBox("Remove the alert mod?", "Warnings go back to chat only.", "Remove", true)) return;
+    try { const r = await api("/alerts/uninstall", {}); toast(r.message); } catch (err) { toast(err.message, true); }
+    renderAlertsPanel();
+  }
+});
+$("#sub-setup").addEventListener("change", async e => {
+  if (e.target.id !== "al-warn") return;
+  try { await api("/alerts/prefs", { useForWarnings: e.target.checked }); toast(e.target.checked ? "Warnings will show on screen" : "Warnings in chat only"); }
+  catch (err) { toast(err.message, true); e.target.checked = !e.target.checked; }
+});
+$("#sub-setup").addEventListener("submit", async e => {
+  if (e.target.id !== "al-test") return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  try { await api("/alerts/send", { text: $("#al-text").value, prio: +$("#al-prio").value, seconds: 10 }); toast("Alert sent"); $("#al-text").value = ""; }
+  catch (err) { toast(err.message, true); }
+}, true);
+
 // ------------------------------------------------------------------ boot
 let start = "tab-overview";
 try { start = localStorage.getItem("mgr-tab") || start; } catch {}
@@ -1172,7 +1254,11 @@ setInterval(() => { if (!document.hidden) refreshChat(); }, 5000);
 refreshUpdate(false);
 setInterval(() => refreshUpdate(false), 30 * 60000);
 refreshDecay();
-setInterval(() => { if (!document.hidden) refreshDecay(); }, 2 * 60000);
+refreshAlerts();
+setInterval(() => { if (!document.hidden) refreshAlerts(); }, 60000);
+setInterval(() => { if (!document.hidden) refreshDecay();
+refreshAlerts();
+setInterval(() => { if (!document.hidden) refreshAlerts(); }, 60000); }, 2 * 60000);
 refreshRemote();
 setInterval(refreshRemote, 20000);
 setInterval(refreshStatus, 3000);
