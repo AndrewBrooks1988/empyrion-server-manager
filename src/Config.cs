@@ -481,3 +481,100 @@ public class SteamNames(ServerFiles files, LogWatcher logs, ILogger<SteamNames> 
 
     record CacheItem(string Name, DateTimeOffset At);
 }
+
+// ============================================================ structures at risk of decay
+
+public record DecayRisk(long EntityId, string Name, string Type, string Playfield, string? Owner, int Blocks, bool HasCore,
+                        string Reason, double HoursLeft, bool Overdue);
+
+/// <summary>
+/// The game's DecayTime rule removes player structures that have NO core OR FEWER THAN 10 BLOCKS once they haven't been
+/// visited (a player close enough to load them) for DecayTime hours. The check runs when the playfield next loads, so
+/// "overdue" structures go the next time anyone enters that playfield. This lists them from a lock-free copy of global.db.
+/// </summary>
+public class DecayService(ServerFiles files, LogWatcher logs, GameOptionsService gameOptions, ILogger<DecayService> logger)
+{
+    const double TicksPerSecond = 20;                // server ticks advance ~20/s while it runs (see the log's INFO lines)
+    const int MinBlocks = 10;
+    readonly SemaphoreSlim gate = new(1, 1);
+    (DateTime At, object Result)? cache;
+
+    string CopyPath => Path.Combine(Path.GetTempPath(), "EmpyrionManager", "global-decay-copy.db");
+
+    public int DecayHours()
+    {
+        var f = gameOptions.Get().Fields.FirstOrDefault(x => x.Def.Key == "DecayTime");
+        return f?.Value is { } v && int.TryParse(v, out var h) ? h : 24;   // game default for multiplayer
+    }
+
+    long? NowTicks()
+    {
+        var i = logs.Info;
+        if (i.Ticks is not long t || i.At is not DateTimeOffset at) return null;
+        return t + (long)((DateTimeOffset.Now - at).TotalSeconds * TicksPerSecond);
+    }
+
+    public async Task<object> GetAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (cache is { } c && DateTime.UtcNow - c.At < TimeSpan.FromSeconds(60)) return c.Result;
+            var hours = DecayHours();
+            var now = NowTicks();
+            var items = new List<DecayRisk>();
+            string? problem = null;
+            if (hours <= 0) problem = "Decay is switched off (DecayTime 0).";
+            else if (now == null) problem = "Waiting for the server to report its clock (once a minute while it runs).";
+            else
+            {
+                var src = Path.Combine(files.GameDir, "global.db");
+                if (!File.Exists(src)) problem = "The save's database doesn't exist yet.";
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(CopyPath)!);
+                    using (var from = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var to = new FileStream(CopyPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        from.CopyTo(to);
+                    var cs = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+                        { DataSource = CopyPath, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly, Pooling = false }.ToString();
+                    using var db = new Microsoft.Data.Sqlite.SqliteConnection(cs);
+                    db.Open();
+                    using var cmd = db.CreateCommand();
+                    cmd.CommandText = """
+                        SELECT e.entityid, e.name, e.etype, p.name, o.name, s.cntblocks, s.coretype, s.lastvisitedticks
+                        FROM Entities e
+                        JOIN Structures s ON s.entityid = e.entityid
+                        JOIN Playfields p ON p.pfid = e.pfid
+                        LEFT JOIN Entities o ON o.entityid = e.belongstoentityid
+                        WHERE e.isstructure = 1 AND e.isremoved = 0 AND s.playercreated = 1
+                          AND (s.cntblocks < $min OR s.coretype < 1)
+                        """;
+                    cmd.Parameters.AddWithValue("$min", MinBlocks);
+                    using var r = cmd.ExecuteReader();
+                    while (r.Read())
+                    {
+                        var blocks = r.IsDBNull(5) ? -1 : r.GetInt32(5);
+                        var hasCore = !r.IsDBNull(6) && r.GetInt32(6) >= 1;
+                        var visited = r.IsDBNull(7) ? 0 : r.GetInt64(7);
+                        var left = hours - (now.Value - visited) / TicksPerSecond / 3600.0;
+                        var reason = !hasCore && blocks is >= 0 and < MinBlocks ? $"no core, {blocks} blocks"
+                                   : !hasCore ? "no core" : $"only {blocks} blocks (needs {MinBlocks}+)";
+                        var type = (r.IsDBNull(2) ? 0 : r.GetInt32(2)) switch { 2 => "Base", 3 => "Capital vessel", 4 => "Small vessel", 5 => "Hover vessel", _ => "Structure" };
+                        items.Add(new DecayRisk(r.GetInt64(0), r.IsDBNull(1) ? "?" : r.GetString(1), type, r.GetString(3),
+                                                r.IsDBNull(4) ? null : r.GetString(4), blocks, hasCore, reason, Math.Round(left, 1), left <= 0));
+                    }
+                }
+            }
+            var result = new { decayHours = hours, minBlocks = MinBlocks, problem, items = items.OrderBy(i => i.HoursLeft).ToList() };
+            cache = (DateTime.UtcNow, result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Decay check failed");
+            return new { decayHours = 0, minBlocks = MinBlocks, problem = "Couldn't read the save right now - will retry.", items = new List<DecayRisk>() };
+        }
+        finally { gate.Release(); }
+    }
+}

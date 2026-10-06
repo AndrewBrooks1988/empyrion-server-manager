@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+- **At risk of decay:** a new Overview panel lists player structures the game's decay rule will remove (no core, or fewer than 10 blocks), with time left before removal, colour-coded as it gets close. Overdue structures go the next time anyone enters their playfield. Visiting a structure resets its timer.
+
 ## 2.2.0
 
 - **Daily wipes for everything else:** a third daily option wipes every visited playfield *outside* the starter systems (planets, moons and space), alongside the existing starter-system and space-sector options. Wipe types are merged per playfield, so nothing is wiped twice.

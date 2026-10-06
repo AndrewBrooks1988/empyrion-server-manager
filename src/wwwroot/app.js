@@ -340,6 +340,22 @@ $("#known").addEventListener("change", async e => {
   slot.innerHTML = roleLink(p);
 });
 
+// ------------------------------------------------------------------ decay warnings
+async function refreshDecay() {
+  let d;
+  try { d = await api("/decay"); } catch { return; }
+  $("#decay-rule").textContent = d.decayHours > 0 ? `Removed after ${d.decayHours >= 48 && d.decayHours % 24 === 0 ? d.decayHours / 24 + " days" : d.decayHours + " h"} unvisited` : "";
+  const box = $("#decay");
+  if (d.problem) { box.innerHTML = `<p class="empty">${esc(d.problem)}</p>`; return; }
+  const left = h => h <= 0 ? "overdue" : h < 1 ? "under 1 h left" : h < 48 ? `${Math.floor(h)} h left` : `${Math.floor(h / 24)} d ${Math.floor(h % 24)} h left`;
+  box.innerHTML = d.items.length ? d.items.map(i => `
+    <div class="dk ${i.overdue ? "over" : i.hoursLeft < 24 ? "soon" : i.hoursLeft < 72 ? "near" : ""}">
+      <span class="n">${esc(i.name)} <span class="muted small">${esc(i.type)}</span></span><span class="t">${left(i.hoursLeft)}</span>
+      <span class="kp-sub">${esc(i.owner || "unknown owner")} · ${esc(i.playfield)} · ${esc(i.reason)}</span>
+    </div>`).join("") + `<p class="muted small" style="margin:6px 0 0">Visit it (get close enough for it to load) to reset the timer, or give it a core and ${d.minBlocks}+ blocks to make it permanent.${d.items.some(i => i.overdue) ? " <b>Overdue</b> structures are removed the next time anyone enters that playfield." : ""}</p>`
+    : `<p class="empty">Nothing at risk. Every player structure has a core and ${d.minBlocks}+ blocks.</p>`;
+}
+
 async function unban(id) {
   try { await api(`/bans/${id}/unban`, {}); toast(`Unbanned ${id}`); refreshPeople(); }
   catch (e) { toast(e.message, true); }
@@ -1155,6 +1171,8 @@ refreshChat();
 setInterval(() => { if (!document.hidden) refreshChat(); }, 5000);
 refreshUpdate(false);
 setInterval(() => refreshUpdate(false), 30 * 60000);
+refreshDecay();
+setInterval(() => { if (!document.hidden) refreshDecay(); }, 2 * 60000);
 refreshRemote();
 setInterval(refreshRemote, 20000);
 setInterval(refreshStatus, 3000);

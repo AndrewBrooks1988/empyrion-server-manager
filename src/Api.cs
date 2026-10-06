@@ -83,6 +83,8 @@ public static class Api
 
         api.MapGet("/player-history", (LogWatcher logs) => Results.Json(logs.GetHistory()));
 
+        api.MapGet("/decay", async (DecayService decay) => Results.Json(await decay.GetAsync()));
+
         api.MapGet("/chat", async (ChatService chat) => Results.Json(await chat.GetEntriesAsync()));
 
         api.MapGet("/log", (LogWatcher logs, long? after, int? max) =>

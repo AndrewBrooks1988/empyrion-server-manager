@@ -288,3 +288,12 @@ input[type=number],input[type=time],input[type=password]{background:var(--panel-
 a.btn{text-decoration:none;color:inherit;display:inline-block}
 
 .paths.about-dl dd{font-family:var(--body);font-size:.88rem;word-break:normal}
+
+/* decay warnings */
+.decay{display:flex;flex-direction:column;gap:8px}
+.decay .dk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding-left:9px;border-left:3px solid var(--line)}
+.decay .dk .n{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.decay .dk .t{font:600 .78rem/1.4 var(--mono);color:var(--ink-2)}
+.decay .dk .kp-sub{grid-column:1 / -1;font:400 .74rem/1.3 var(--mono);color:var(--ink-2)}
+.decay .dk.near{border-left-color:var(--warn)} .decay .dk.near .t{color:var(--warn)}
+.decay .dk.soon,.decay .dk.over{border-left-color:var(--bad)} .decay .dk.soon .t,.decay .dk.over .t{color:var(--bad)}
