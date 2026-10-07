@@ -69,5 +69,8 @@ Portable: ``EmpyrionServerManager-$version-win-x64.zip`` (unzip and run ``Empyri
 "@ | Set-Content $notes -Encoding utf8
 
 git -C $root tag -a "v$version" -m "v$version"
-git -C $root push origin "v$version"
+$ErrorActionPreference = 'Continue'          # git writes progress to stderr; judge by exit code
+git -C $root push origin "v$version" 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "git push of tag v$version failed" }
+$ErrorActionPreference = 'Stop'
 & $gh release create "v$version" $setup "$setup.sig" $zip --repo AndrewBrooks1988/empyrion-server-manager --title "v$version" --notes-file $notes
