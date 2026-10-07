@@ -334,6 +334,10 @@ public static class SettingsApi
                     if (string.IsNullOrWhiteSpace(names.DailyName) || string.IsNullOrWhiteSpace(names.WeeklyName) || names.DailyName == names.WeeklyName)
                         return Fail("Give the two tasks different names.");
                     if (!names.Folder.StartsWith('\\')) names.Folder = "\\" + names.Folder;
+                    // the schedule form only edits the maintenance names; keep the startup task settings as they are
+                    if (!t.TryGetProperty("managerStartName", out _)) names.ManagerStartName = o.Tasks.ManagerStartName;
+                    if (!t.TryGetProperty("serverStartName", out _)) names.ServerStartName = o.Tasks.ServerStartName;
+                    if (!t.TryGetProperty("serverStartDelayMinutes", out _)) names.ServerStartDelayMinutes = o.Tasks.ServerStartDelayMinutes;
                     o.Tasks = names;
                 }
             }
@@ -357,6 +361,7 @@ public static class SettingsApi
                     case "remove": await tasks.RemoveAsync(key); break;
                     case "enable": await tasks.SetEnabledAsync(key, true); break;
                     case "disable": await tasks.SetEnabledAsync(key, false); break;
+                    case "run": await tasks.RunAsync(key); break;
                     default: return Results.NotFound();
                 }
                 return Results.Json(new { ok = true });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.0
+
+- **Start at sign-in:** two new cards on the Maintenance page install Task Scheduler tasks that start the manager (without opening the browser) and the game server (a minute later, only if it isn't already running) when you sign in to Windows. Because Task Scheduler starts them, closing the terminal or app you launched things from no longer takes them down.
+- Only one copy of the manager runs per install. Starting it again just opens the dashboard.
+- The maintenance script has a new `-Mode Start`.
+
 ## 2.4.0
 
 - **On-screen alerts:** restart and shutdown warnings (and any message you choose) can now appear as the game's coloured banner at the top of the screen, with a sound, not just in chat. Blue changes to yellow, then red, as a restart gets close. This uses a tiny server-side mod (`EmpyrionManagerAlerts`) that the manager installs from **Settings -> Setup -> On-screen alerts**. It runs on the server only, so players don't need anything. Without the mod, everything falls back to chat.

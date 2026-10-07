@@ -14,6 +14,20 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 
 // manager-settings.json (created by the setup page). Falls back to appsettings.json's "Manager" section.
 var options = ManagerOptions.Load(exeDir, builder.Configuration);
+
+// one manager per install: if it's already running (e.g. started by the sign-in task), just show its dashboard
+var instanceId = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+    System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(exeDir).TrimEnd('\\').ToLowerInvariant())))[..16];
+using var instance = new Mutex(true, @"Local\EmpyrionManager-" + instanceId, out var firstInstance);
+if (!firstInstance)
+{
+    Console.WriteLine($"{options.Title} is already running at {options.Url}");
+    if (!args.Contains("--no-browser"))
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(options.Url.Replace("0.0.0.0", "127.0.0.1")) { UseShellExecute = true }); }
+        catch { /* no default browser - fine */ }
+    return;
+}
+
 builder.WebHost.UseUrls(options.Url);
 
 builder.Services.AddSingleton(options);

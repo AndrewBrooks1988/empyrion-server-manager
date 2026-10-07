@@ -53,7 +53,7 @@
     powershell -ExecutionPolicy Bypass -File scripts\Empyrion-Maintenance.ps1 -Mode Daily -DryRun
 #>
 param(
-    [Parameter(Mandatory)] [ValidateSet('Daily', 'Weekly', 'Play', 'Restart', 'Stop')] [string] $Mode,
+    [Parameter(Mandatory)] [ValidateSet('Daily', 'Weekly', 'Play', 'Restart', 'Stop', 'Start')] [string] $Mode,
     [string] $Warn,
     [string] $Settings,
     [switch] $DryRun,
@@ -237,6 +237,24 @@ function Get-WipeCommands {
 
 # ================================================================ main
 Write-Log "==== $Mode maintenance started$(if ($DryRun) { ' (DRY RUN)' })"
+
+if ($Mode -eq 'Start') {
+    # sign-in task: start the server if it isn't already up (no warnings, no backup, no wipes)
+    if (Get-DediProcess) { Write-Log 'Server is already running - nothing to do.'; exit 0 }
+    $staged = Join-Path $AlertDir 'EmpyrionManagerAlerts.dll.new'
+    if ((Test-Path $staged) -and -not $DryRun) { Move-Item $staged (Join-Path $AlertDir 'EmpyrionManagerAlerts.dll') -Force; Write-Log 'Applied alert mod update' }
+    Write-Log "Starting server ($LaunchMode -dedicated $ConfigFile)"
+    if (-not $DryRun) {
+        Start-Process -FilePath (Join-Path $ServerDir 'EmpyrionLauncher.exe') -WorkingDirectory $ServerDir `
+                      -ArgumentList $LaunchMode, '-dedicated', $ConfigFile
+        $deadline = (Get-Date).AddSeconds($StartupTimeoutSec)
+        while (-not (Test-Telnet) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 10 }
+        if (-not (Test-Telnet)) { Write-Log "WARNING: server not answering Telnet after $StartupTimeoutSec s (it may still be loading)."; exit 1 }
+        Write-Log 'Server is up'
+    }
+    Write-Log "==== $Mode finished"
+    exit 0
+}
 
 if ($Mode -eq 'Play') {
     if (Get-Process -Name $ClientProcess -ErrorAction SilentlyContinue) { Write-Log 'Game is already running - nothing to do.'; exit 0 }

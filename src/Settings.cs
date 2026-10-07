@@ -39,6 +39,10 @@ public class TaskSettings
     public string Folder { get; set; } = @"\Empyrion\";
     public string DailyName { get; set; } = "Empyrion Daily Maintenance";
     public string WeeklyName { get; set; } = "Empyrion Weekly Reset";
+    public string ManagerStartName { get; set; } = "Empyrion Server Manager (start at sign-in)";
+    public string ServerStartName { get; set; } = "Empyrion Server (start at sign-in)";
+    /// <summary>Minutes after sign-in before the server task starts the game server (lets Windows/Steam settle).</summary>
+    public int ServerStartDelayMinutes { get; set; } = 1;
 }
 
 /// <summary>

@@ -640,28 +640,42 @@ public class JobRunner(ManagerOptions o)
 
 // ============================================================ scheduled tasks
 
-public record TaskInfo(string Key, string Name, string Description, bool Exists, bool Enabled, string Status,
+public record TaskInfo(string Key, string Kind, string Name, string Description, bool Exists, bool Enabled, string Status,
                        string? NextRun, string? LastRun, string? LastResult, string? Schedule, int WarningMinutes,
                        bool UpToDate, string? Problem);
 
 /// <summary>
-/// The daily/weekly maintenance tasks in Windows Task Scheduler. Names, folder, days and times come from
-/// manager-settings.json; the tasks run scripts\Empyrion-Maintenance.ps1 with -Settings pointing at that file.
+/// The manager's Windows Task Scheduler tasks:
+///   daily / weekly   - maintenance runs (scripts\Empyrion-Maintenance.ps1 -Mode Daily|Weekly)
+///   manager / server - start the manager and the game server when the user signs in to Windows.
+/// Started this way they run under Task Scheduler, independent of whatever app or terminal installed them.
+/// Names, folder, days and times come from manager-settings.json.
 /// </summary>
 public class TaskService(ManagerOptions o)
 {
-    public IEnumerable<string> Keys => ["daily", "weekly"];
+    public IEnumerable<string> Keys => ["daily", "weekly", "manager", "server"];
+    public static bool IsStartup(string key) => key is "manager" or "server";
 
-    string Name(string key) => key == "daily" ? o.Tasks.DailyName : o.Tasks.WeeklyName;
+    string Name(string key) => key switch
+    {
+        "daily" => o.Tasks.DailyName, "weekly" => o.Tasks.WeeklyName,
+        "manager" => o.Tasks.ManagerStartName, _ => o.Tasks.ServerStartName,
+    };
     string Folder => o.Tasks.Folder.EndsWith('\\') ? o.Tasks.Folder : o.Tasks.Folder + "\\";
     string[] Days(string key) => key == "daily" ? o.Maintenance.DailyDays : o.Maintenance.WeeklyDays;
     string Mode(string key) => key == "daily" ? "Daily" : "Weekly";
+    string ManagerExe => Path.Combine(o.AppDir, "EmpyrionManager.exe");
+    int ServerDelayMinutes => Math.Clamp(o.Tasks.ServerStartDelayMinutes, 0, 30);
 
-    public string Description(string key) => key == "daily"
-        ? $"Restart, backup{(o.Maintenance.DailyStarterWipe.Length > 0 ? ", starter-system " + o.Maintenance.DailyStarterWipe + " wipe" : "")}{(o.Maintenance.DailySpaceWipe.Length > 0 ? ", " + o.Maintenance.DailySpaceWipe + " wipe in every visited space sector (asteroids)" : "")}{(o.Maintenance.DailyOtherWipe.Length > 0 ? ", " + o.Maintenance.DailyOtherWipe + " wipe on everything else visited" : "")}{(o.Maintenance.TwiceDaily ? ". Twice a day (every 12 hours)" : "")}"
-        : $"Restart, backup{(o.Maintenance.WeeklyWipe.Length > 0 ? ", " + o.Maintenance.WeeklyWipe + " wipe on every visited playfield" : "")}";
+    public string Description(string key) => key switch
+    {
+        "daily" => $"Restart, backup{(o.Maintenance.DailyStarterWipe.Length > 0 ? ", starter-system " + o.Maintenance.DailyStarterWipe + " wipe" : "")}{(o.Maintenance.DailySpaceWipe.Length > 0 ? ", " + o.Maintenance.DailySpaceWipe + " wipe in every visited space sector (asteroids)" : "")}{(o.Maintenance.DailyOtherWipe.Length > 0 ? ", " + o.Maintenance.DailyOtherWipe + " wipe on everything else visited" : "")}{(o.Maintenance.TwiceDaily ? ". Twice a day (every 12 hours)" : "")}",
+        "weekly" => $"Restart, backup{(o.Maintenance.WeeklyWipe.Length > 0 ? ", " + o.Maintenance.WeeklyWipe + " wipe on every visited playfield" : "")}",
+        "manager" => "Starts the manager (this dashboard) when you sign in to Windows, without opening the browser.",
+        _ => $"Starts the game server when you sign in to Windows{(ServerDelayMinutes > 0 ? $", {ServerDelayMinutes} min later" : "")}, unless it's already running.",
+    };
 
-    /// <summary>Local time the task fires: the restart time (+ offset hours) minus the longest warning.</summary>
+    /// <summary>Local time a maintenance task fires: the restart time (+ offset hours) minus the longest warning.</summary>
     public string StartTime(int offsetHours = 0)
     {
         var restart = TimeSpan.TryParse(o.Maintenance.RestartTime, CultureInfo.InvariantCulture, out var t) ? t : new TimeSpan(4, 0, 0);
@@ -670,7 +684,7 @@ public class TaskService(ManagerOptions o)
         return $"{(int)start.TotalHours:00}:{start.Minutes:00}";
     }
 
-    /// <summary>The triggers a task should have: (day mask, start HH:mm). Twice-daily adds a second daily run 12h later, every day.</summary>
+    /// <summary>Weekly triggers a maintenance task should have: (day mask, start HH:mm).</summary>
     List<(int Mask, string Start)> ExpectedTriggers(string key)
     {
         var list = new List<(int, string)>();
@@ -684,8 +698,15 @@ public class TaskService(ManagerOptions o)
         return list;
     }
 
-    string ExpectedArguments(string key) =>
-        $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{o.ScriptPath}\" -Mode {Mode(key)} -Settings \"{o.SettingsPath}\"";
+    string ScriptArgs(string mode) =>
+        $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{o.ScriptPath}\" -Mode {mode} -Settings \"{o.SettingsPath}\"";
+
+    (string Execute, string Args) ExpectedAction(string key) => key switch
+    {
+        "manager" => (ManagerExe, "--no-browser"),
+        "server" => ("powershell.exe", ScriptArgs("Start")),
+        _ => ("powershell.exe", ScriptArgs(Mode(key))),
+    };
 
     static readonly string[] FullDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     static int DayIndex(string d) => Array.FindIndex(FullDays, x => x.StartsWith(d, StringComparison.OrdinalIgnoreCase));
@@ -713,12 +734,13 @@ public class TaskService(ManagerOptions o)
             "[pscustomobject]@{ State = [string]$t.State; " +
             "Next = if ($i.NextRunTime) { $i.NextRunTime.ToString('o') } else { $null }; " +
             "Last = if ($i.LastRunTime -and $i.LastRunTime.Year -gt 2000) { $i.LastRunTime.ToString('o') } else { $null }; " +
-            "Result = $i.LastTaskResult; Args = [string]$a.Arguments; " +
-            "Triggers = @($t.Triggers | ForEach-Object { [pscustomobject]@{ Days = [int]$_.DaysOfWeek; Start = [string]$_.StartBoundary } }) } | ConvertTo-Json -Compress -Depth 4 }";
+            "Result = $i.LastTaskResult; Exec = [string]$a.Execute; Args = [string]$a.Arguments; " +
+            "Triggers = @($t.Triggers | ForEach-Object { [pscustomobject]@{ Kind = [string]$_.CimClass.CimClassName; Days = [int]$_.DaysOfWeek; Start = [string]$_.StartBoundary; Delay = [string]$_.Delay } }) } | ConvertTo-Json -Compress -Depth 4 }";
         var json = (await RunPowerShell(script)).Trim();
         var lead = o.Maintenance.LeadMinutes;
+        var kind = IsStartup(key) ? "startup" : "schedule";
         if (json.Length == 0)
-            return new TaskInfo(key, Name(key), Description(key), false, false, "Not installed", null, null, null, null, lead, false, null);
+            return new TaskInfo(key, kind, Name(key), Description(key), false, false, "Not installed", null, null, null, null, lead, false, null);
 
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var r = doc.RootElement;
@@ -728,32 +750,52 @@ public class TaskService(ManagerOptions o)
             ? res.GetInt64() switch { 0 => "Completed OK", 267011 => null, 267009 => "Running now", var c => $"Exit code {c}" }
             : null;
 
-        var installed = new List<(int Mask, string Start)>();
+        var triggers = new List<(string Kind, int Mask, string Start, string Delay)>();
         if (r.TryGetProperty("Triggers", out var trs))
         {
             var items = trs.ValueKind == System.Text.Json.JsonValueKind.Array ? trs.EnumerateArray().ToList() : [trs];
             foreach (var tr in items)
             {
+                string Str(string k) => tr.TryGetProperty(k, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() ?? "" : "";
                 var days = tr.TryGetProperty("Days", out var dd) && dd.ValueKind == System.Text.Json.JsonValueKind.Number ? dd.GetInt32() : 0;
-                var start = tr.TryGetProperty("Start", out var ss) && DateTime.TryParse(ss.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
-                    ? at.ToString("HH:mm") : "?";
-                installed.Add((days, start));
+                var start = DateTime.TryParse(Str("Start"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var at) ? at.ToString("HH:mm") : "?";
+                triggers.Add((Str("Kind"), days, start, Str("Delay")));
             }
         }
-        string Restart(string start) => TimeSpan.TryParse(start, CultureInfo.InvariantCulture, out var ts)
-            ? DateTime.Today.Add(ts).AddMinutes(lead).ToString("HH:mm") : "?";
-        var schedule = installed.Count == 0 ? null
-            : string.Join(" + ", installed.Select(x => $"{DayList(x.Mask)} · restart {Restart(x.Start)}")) + (installed.Count > 0 ? $" (warnings {lead} min before)" : "");
 
-        // does the installed task match the current settings?
         var problems = new List<string>();
-        if (!string.Equals(S("Args"), ExpectedArguments(key), StringComparison.OrdinalIgnoreCase)) problems.Add("runs a different script or settings file");
-        var expected = ExpectedTriggers(key);
-        if (!expected.OrderBy(x => x.Start).ThenBy(x => x.Mask).SequenceEqual(installed.OrderBy(x => x.Start).ThenBy(x => x.Mask)))
-            problems.Add("schedule differs from the settings");
-        return new TaskInfo(key, Name(key), Description(key), true, !state.Equals("Disabled", StringComparison.OrdinalIgnoreCase),
-                            state, S("Next"), S("Last"), lastResult, schedule, lead, problems.Count == 0,
+        var (exe, args) = ExpectedAction(key);
+        if (!string.Equals(S("Exec"), exe, StringComparison.OrdinalIgnoreCase) || !string.Equals(S("Args"), args, StringComparison.OrdinalIgnoreCase))
+            problems.Add("runs a different program, script or settings file");
+        string? schedule;
+        if (IsStartup(key))
+        {
+            var logon = triggers.FirstOrDefault(t => t.Kind.Contains("Logon", StringComparison.OrdinalIgnoreCase));
+            var delay = key == "server" ? ServerDelayMinutes : 0;
+            if (logon.Kind == null || triggers.Count != 1) problems.Add("isn't a single at-sign-in trigger");
+            else if (DelayMinutes(logon.Delay) != delay) problems.Add("start delay differs from the settings");
+            schedule = "When you sign in to Windows" + (delay > 0 ? $" (+{delay} min)" : "");
+        }
+        else
+        {
+            var installed = triggers.Select(t => (t.Mask, t.Start)).ToList();
+            string Restart(string start) => TimeSpan.TryParse(start, CultureInfo.InvariantCulture, out var ts)
+                ? DateTime.Today.Add(ts).AddMinutes(lead).ToString("HH:mm") : "?";
+            schedule = installed.Count == 0 ? null
+                : string.Join(" + ", installed.Select(x => $"{DayList(x.Mask)} · restart {Restart(x.Start)}")) + $" (warnings {lead} min before)";
+            var expected = ExpectedTriggers(key);
+            if (!expected.OrderBy(x => x.Start).ThenBy(x => x.Mask).SequenceEqual(installed.OrderBy(x => x.Start).ThenBy(x => x.Mask)))
+                problems.Add("schedule differs from the settings");
+        }
+        return new TaskInfo(key, kind, Name(key), Description(key), true, !state.Equals("Disabled", StringComparison.OrdinalIgnoreCase),
+                            state, IsStartup(key) ? null : S("Next"), S("Last"), lastResult, schedule, lead, problems.Count == 0,
                             problems.Count == 0 ? null : "Needs updating: " + string.Join("; ", problems));
+    }
+
+    static int DelayMinutes(string isoDuration)
+    {
+        if (string.IsNullOrEmpty(isoDuration)) return 0;
+        try { return (int)System.Xml.XmlConvert.ToTimeSpan(isoDuration).TotalMinutes; } catch { return -1; }
     }
 
     // Task Scheduler DaysOfWeek bitmask: Sunday = 1 ... Saturday = 64
@@ -769,33 +811,54 @@ public class TaskService(ManagerOptions o)
         return consecutive ? $"{N(order.First())}–{N(order.Last())}" : string.Join(", ", order.Select(N));
     }
 
-    /// <summary>Creates or updates the task from the current settings (runs as the current user, while logged on).</summary>
+    /// <summary>Creates or updates the task from the current settings (runs as the current user, while signed in).</summary>
     public async Task InstallAsync(string key)
     {
         if (!Keys.Contains(key)) throw new ArgumentException("Unknown task.");
-        if (!File.Exists(o.ScriptPath)) throw new InvalidOperationException($"Maintenance script not found: {o.ScriptPath}");
-        var triggers = ExpectedTriggers(key);
-        if (triggers.Count == 0) throw new InvalidOperationException("Pick at least one day for this task.");
+        var (exe, args) = ExpectedAction(key);
+        if (key == "manager" && !File.Exists(ManagerExe)) throw new InvalidOperationException($"Manager not found: {ManagerExe}");
+        if (key != "manager" && !File.Exists(o.ScriptPath)) throw new InvalidOperationException($"Maintenance script not found: {o.ScriptPath}");
+
         var lines = new List<string>
         {
             "$ErrorActionPreference = 'Stop'",
-            $"$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument {Q(ExpectedArguments(key))} -WorkingDirectory {Q(o.AppDir)}",
+            $"$action = New-ScheduledTaskAction -Execute {Q(exe)} -Argument {Q(args)} -WorkingDirectory {Q(o.AppDir)}",
             "$triggers = @()",
         };
-        foreach (var (mask, at) in triggers)
+        if (IsStartup(key))
         {
-            lines.Add($"$tr = New-ScheduledTaskTrigger -Weekly -DaysOfWeek {string.Join(",", DayNames(mask))} -At {Q(at)}");
-            lines.Add($"$tr.StartBoundary = (Get-Date {Q(at)}).ToString('yyyy-MM-ddTHH:mm:ss')   # no fixed UTC offset: follows daylight saving");
+            lines.Add("$tr = New-ScheduledTaskTrigger -AtLogOn -User \"$env:USERDOMAIN\\$env:USERNAME\"");
+            if (key == "server" && ServerDelayMinutes > 0) lines.Add($"$tr.Delay = 'PT{ServerDelayMinutes}M'");
             lines.Add("$triggers += $tr");
         }
+        else
+        {
+            var triggers = ExpectedTriggers(key);
+            if (triggers.Count == 0) throw new InvalidOperationException("Pick at least one day for this task.");
+            foreach (var (mask, at) in triggers)
+            {
+                lines.Add($"$tr = New-ScheduledTaskTrigger -Weekly -DaysOfWeek {string.Join(",", DayNames(mask))} -At {Q(at)}");
+                lines.Add($"$tr.StartBoundary = (Get-Date {Q(at)}).ToString('yyyy-MM-ddTHH:mm:ss')   # no fixed UTC offset: follows daylight saving");
+                lines.Add("$triggers += $tr");
+            }
+        }
+        // the manager task IS the long-running manager, so it must never be time-limited; the others finish on their own
+        var limit = key == "manager" ? "(New-TimeSpan -Seconds 0)" : "(New-TimeSpan -Hours 2)";
         lines.AddRange([
             "$principal = New-ScheduledTaskPrincipal -UserId \"$env:USERDOMAIN\\$env:USERNAME\" -LogonType Interactive -RunLevel Limited",
-            "$set = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 2) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries",
+            $"$set = New-ScheduledTaskSettingsSet -ExecutionTimeLimit {limit} -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries",
             $"Register-ScheduledTask -TaskPath {Q(Folder)} -TaskName {Q(Name(key))} -Action $action -Trigger $triggers -Principal $principal -Settings $set -Description {Q(Description(key))} -Force | Out-Null",
             "'OK'",
         ]);
         var output = (await RunPowerShell(string.Join("\n", lines))).Trim();
         if (!output.EndsWith("OK")) throw new InvalidOperationException("Task Scheduler refused: " + output);
+    }
+
+    /// <summary>Runs a task now through Task Scheduler (used to start things independently of the caller).</summary>
+    public async Task RunAsync(string key)
+    {
+        var output = (await RunPowerShell($"Start-ScheduledTask -TaskPath {Q(Folder)} -TaskName {Q(Name(key))} -ErrorAction Stop; 'OK'")).Trim();
+        if (!output.EndsWith("OK")) throw new InvalidOperationException(output);
     }
 
     public async Task RemoveAsync(string key)
@@ -812,6 +875,7 @@ public class TaskService(ManagerOptions o)
         if (!output.EndsWith("OK")) throw new InvalidOperationException(output);
     }
 }
+
 
 // ============================================================ backups
 

@@ -489,7 +489,7 @@ logBox.addEventListener("scroll", () => {
 // ------------------------------------------------------------------ maintenance
 async function refreshTasks() {
   try { tasks = await api("/tasks"); } catch { return; }
-  const upcoming = tasks.filter(t => t.enabled && t.nextRun);
+  const upcoming = tasks.filter(t => t.kind !== "startup" && t.enabled && t.nextRun);
   const next = upcoming.map(t => ({ t, d: parseTaskDate(t.nextRun) })).filter(x => x.d).sort((a, b) => a.d - b.d)[0];
   const restartAt = next ? new Date(next.d.getTime() + (next.t.warningMinutes || 0) * 60000) : null;
   $("#m-next").textContent = restartAt ? fmtTime(restartAt) : tasks.some(t => t.exists) ? "Paused" : "Not set up";
@@ -514,11 +514,13 @@ async function loadMaintenance() {
 }
 
 function renderTasks() {
+  const TITLES = { daily: "Daily maintenance", weekly: "Weekly reset", manager: "Start manager at sign-in", server: "Start server at sign-in" };
   $("#tasks").innerHTML = tasks.map(t => {
-    const title = t.key === "weekly" ? "Weekly reset" : "Daily maintenance";
+    const title = TITLES[t.key] || t.name;
+    const startup = t.kind === "startup";
     const state = !t.exists ? `<span class="tag warn">Not installed</span>`
       : !t.upToDate ? `<span class="tag warn">Needs update</span>`
-      : `<label class="switch"><input type="checkbox" data-task="${t.key}" ${t.enabled ? "checked" : ""}> ${t.enabled ? "On" : "Paused"}</label>`;
+      : `<label class="switch"><input type="checkbox" data-task="${t.key}" ${t.enabled ? "checked" : ""}> ${t.enabled ? "On" : startup ? "Off" : "Paused"}</label>`;
     return `
     <div class="panel task">
       <div class="panel-head"><h2>${title}</h2>${state}</div>
@@ -527,8 +529,8 @@ function renderTasks() {
       <dl>
         <dt>Task</dt><dd class="mono small">${esc(t.name)}</dd>
         ${t.exists ? `
-        <dt>Schedule</dt><dd>${esc(t.schedule || "–")}</dd>
-        <dt>Next restart</dt><dd>${t.enabled ? esc(fmtRestart(t)) : "Paused"}</dd>
+        <dt>${startup ? "Runs" : "Schedule"}</dt><dd>${esc(t.schedule || "–")}</dd>
+        ${startup ? "" : `<dt>Next restart</dt><dd>${t.enabled ? esc(fmtRestart(t)) : "Paused"}</dd>`}
         <dt>Last run</dt><dd>${esc(fmtTaskDate(t.lastRun))}${t.lastResult ? ` <span class="muted">· ${esc(t.lastResult)}</span>` : ""}</dd>` : `
         <dt>Status</dt><dd>Not in Task Scheduler yet. Install it to run automatically.</dd>`}
       </dl>
@@ -537,7 +539,7 @@ function renderTasks() {
           <button class="btn sm ${!t.exists || !t.upToDate ? "primary" : ""}" data-tinstall="${t.key}">${t.exists ? (t.upToDate ? "Reinstall" : "Update task") : "Install task"}</button>
           ${t.exists ? `<button class="btn sm danger" data-tremove="${t.key}">Remove</button>` : ""}
         </span>
-        <button class="btn sm" data-run="${t.key}">Run now…</button>
+        ${startup ? "" : `<button class="btn sm" data-run="${t.key}">Run now…</button>`}
       </div>
     </div>`;
   }).join("");
@@ -556,7 +558,8 @@ $("#tasks").addEventListener("change", async e => {
   if (!cb) return;
   try {
     await api(`/tasks/${cb.dataset.task}/${cb.checked ? "enable" : "disable"}`, {});
-    toast(cb.checked ? "Schedule turned on" : "Schedule paused");
+    const startup = tasks.find(t => t.key === cb.dataset.task)?.kind === "startup";
+    toast(startup ? (cb.checked ? "Will start at sign-in" : "Won't start at sign-in") : cb.checked ? "Schedule turned on" : "Schedule paused");
   } catch (err) { toast(err.message, true); cb.checked = !cb.checked; }
   loadMaintenance();
 });

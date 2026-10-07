@@ -15,6 +15,7 @@ Nothing about a particular server is built in. Everything is set up from the das
   - weekly: chosen wipe types on everything visited
   - player structures are never wiped
   - the Windows scheduled tasks are installed, updated, paused and removed from the dashboard
+- **Start at sign-in:** optional tasks start the manager and the game server when you sign in to Windows (the server a minute later, and only if it isn't already running). They run under Task Scheduler, so they don't depend on whatever terminal or app you started things from.
 - **Backups:** list, back up now, and restore. A restore keeps a copy of the current world first.
 - **Settings:**
   - *Setup:* server folder (auto-detect), pick or create the server config `.yaml`, turn on Telnet, headless or windowed start, dashboard title and address, SteamCMD path and **one-click server update**, optional dashboard password.
@@ -39,7 +40,7 @@ Changes to server settings take effect **when the server next starts**: immediat
 ## Install
 
 **Installer (recommended):** download `EmpyrionServerManager-Setup-<version>.exe` from the [latest release](https://github.com/AndrewBrooks1988/empyrion-server-manager/releases/latest) and run it.
-- It installs for your Windows user only (no admin prompt) into `%LOCALAPPDATA%\Programs\Empyrion Server Manager`, with a Start-menu shortcut, an optional desktop shortcut and an optional **start when I sign in** shortcut.
+- It installs for your Windows user only (no admin prompt) into `%LOCALAPPDATA%\Programs\Empyrion Server Manager`, with a Start-menu shortcut, an optional desktop shortcut and an optional **start when I sign in** shortcut (or use the *Start manager at sign-in* task on the Maintenance page instead; only one copy of the manager ever runs).
 - The installer isn't code-signed yet, so Windows SmartScreen may warn you: click **More info → Run anyway**.
 
 **Portable:** download `EmpyrionServerManager-<version>-win-x64.zip`, unzip it anywhere and run `EmpyrionManager.exe`. Portable copies don't auto-update.
@@ -52,7 +53,7 @@ Then:
    - Pick the server config `.yaml` you start the server with, or **Create** a new one from the template.
    - **Turn on Telnet** if it isn't already. The manager talks to the server through its Telnet console.
    - **Save setup.**
-3. Go to **Maintenance**: set the restart time, days, wipes and starter systems under *Schedule & resets*, save, then **Install task** on the daily and weekly cards.
+3. Go to **Maintenance**: set the restart time, days, wipes and starter systems under *Schedule & resets*, save, then **Install task** on the daily and weekly cards. For a dedicated server PC, also install **Start manager at sign-in** and **Start server at sign-in**.
 4. Start the server from the top bar.
 
 ## Updates
